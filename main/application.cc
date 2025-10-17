@@ -33,11 +33,6 @@
 #include <arpa/inet.h>
 #include "http_wall.h"
 
-#include "stream_sdk.h"
-#include "sdk_mem_adapter.h"
-#include <sys/socket.h>
-#include <netinet/in.h>
-
 #define TAG "Application"
 
 #ifdef __cplusplus
@@ -50,23 +45,6 @@ void register_os_adapters(int sockfd);
 #ifdef __cplusplus
 }
 #endif
-
-static void data_received(sdk_packet_t* packet, void* user_data) {
-    if (!packet) return;
-    //(void*)user_data;
-    if (packet->header.payload_type == 0) {
-        ESP_LOGE(TAG, "Received video frame: %dx%d, size=%u\n",
-               packet->header.width,
-               packet->header.height,
-               packet->payload_size);
-    } else {
-        ESP_LOGE(TAG, "Received audio frame: %lu Hz, %d ch, size=%u\n",
-               packet->header.sample_rate,
-               packet->header.channels,
-               packet->payload_size);
-    }
-    sdk_free(packet->payload);
-}
 
 static const char* const STATE_STRINGS[] = {
     "unknown",

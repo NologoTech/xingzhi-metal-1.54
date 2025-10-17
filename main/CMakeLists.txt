@@ -254,7 +254,7 @@ idf_component_register(SRCS ${SOURCES} ${WALLPAPER_SOURCES}
                     INCLUDE_DIRS ${INCLUDE_DIRS}
                     WHOLE_ARCHIVE
                     )
-target_link_libraries(${COMPONENT_LIB} PRIVATE "${CMAKE_SOURCE_DIR}/components/stream_sdk/libstream_sdk.a")
+#target_link_libraries(${COMPONENT_LIB} PRIVATE "${CMAKE_SOURCE_DIR}/components/stream_sdk/libstream_sdk.a")
 
 # 使用 target_compile_definitions 来定义 BOARD_TYPE, BOARD_NAME
 # 如果 BOARD_NAME 为空，则使用 BOARD_TYPE
