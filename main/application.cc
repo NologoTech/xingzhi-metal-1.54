@@ -31,20 +31,8 @@
 #include <cJSON.h>
 #include <driver/gpio.h>
 #include <arpa/inet.h>
-#include "http_wall.h"
 
 #define TAG "Application"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-// 声明平台适配函数（在 linux_adapter.c 中实现）
-void register_os_adapters(int sockfd);
-// // 声明 SDK 内存释放函数
-// void sdk_free(void* ptr);
-#ifdef __cplusplus
-}
-#endif
 
 static const char* const STATE_STRINGS[] = {
     "unknown",

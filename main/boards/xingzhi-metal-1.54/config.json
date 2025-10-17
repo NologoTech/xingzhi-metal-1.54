@@ -9,7 +9,9 @@
                 "CONFIG_BT_NIMBLE_BLUFI_ENABLE=y",
                 "CONFIG_MBEDTLS_DHM_C=y",
                 "ESP_TLS_INSECURE",
-                "ESP_TLS_SKIP_SERVER_CERT_VERIFY"
+                "ESP_TLS_SKIP_SERVER_CERT_VERIFY",
+                "LV_USE_GIF",
+                "LV_GIF_CACHE_DECODE_DATA"
             ]
         }
     ]
