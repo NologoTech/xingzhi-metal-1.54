@@ -8,10 +8,9 @@
 #include "sdkconfig.h"
 #include "button.h"
 #include "board.h"
-// #include "wake_word_detect.h"
 #include "config.h"
 #include "assets/lang_config.h"
-
+#include <esp_sleep.h>
 
 class PowerManager {
 private:
@@ -31,86 +30,58 @@ private:
     const int kBatteryAdcDataCount = 3;
     const int kLowBatteryLevel = 20;
 
-    bool is_usb_inserted_on_boot = false; // 上电前是否插入usb
+    // power
+    bool pressed = false;                   // 是否按下电源键
+    int PowerControl_ticks_ = 0;            // 开机时长
+    int press_ticks_ = 0;                   // 按下时的tick
+    bool is_first_boot = true;              // 
+    uint8_t PowerDec_level_ = 0;            // 电源键电平
+    const int power_off_ticks_ = 20;        // 按键按下20/5秒准备关机;
+    bool new_charging_status = false;       // 插入usb时无法软件关机
+    bool is_shutting_down_ = false;  // 标记是否进入关机流程
+    int shutdown_delay_ticks_ = 0;   // 关机延迟计数
+    uint8_t shutdown_ticks = 5;      // 5/5s后关机 预留的关机操作
+    bool shutdown_first_ = true;
 
-    bool pressed = false; // 是否按下按键
-    int PowerControl_ticks_ = 0; // 开机时长
-    int press_ticks_ = 0; // 按下时的tick
-    int press_interval_ticks_ = 0; // 按下的时间间隔
-    bool is_first_boot = true; // 新增一个变量用于标记是否为首次开机
-    uint8_t PowerDec_level_ = 0; // 电源键电平
-    const int power_off_ticks_ = 5; // 按键按下5/5秒后关机;
-    bool shutedup = false; // 是否已拉高电平，只需拉高一次
-    bool is_listeningorspreaking = false;// 关机前状态是否为聆听中或说法中
-
-    Button Power_button_ = Button(Power_Dec);
-
-    bool new_charging_status = false;
-
+    // 旧版硬件软件关机逻辑
     void PowrSwitch() {
-        if (is_first_boot == true && shutedup == false) {
-            int usb_adc_value0;
-            ESP_ERROR_CHECK(adc_oneshot_read(adc_handle_, POWER_USBIN_ADC_CHANNEL, &usb_adc_value0));
-            is_usb_inserted_on_boot = (1500 < usb_adc_value0 && usb_adc_value0 < 4000 );
-            ESP_LOGI("powercontrol", "USB ADC VALUE 0: %d", usb_adc_value0);
-            shutedup = true;
-        }
         PowerDec_level_ = gpio_get_level(Power_Dec);
 
+        // 确保开机后电源键松开再检测关机
         if (PowerDec_level_ == 1) {
             is_first_boot = false;
-        } 
+        }
+
+        if (is_shutting_down_) {
+            shutdown_delay_ticks_++;
+            if (shutdown_delay_ticks_ >= shutdown_ticks) {
+                shutdown();
+                is_shutting_down_ = false;
+                shutdown_delay_ticks_ = 0;
+            }
+            return;  
+        }
 
         if (!is_first_boot) {
             PowerControl_ticks_++;
             if (PowerDec_level_ == 0 && pressed == false) {
                 press_ticks_ = PowerControl_ticks_;
                 pressed = true;
-            }
+            }  
             if ((press_ticks_ != 0) &&( PowerControl_ticks_ - press_ticks_ == power_off_ticks_ )&& (!new_charging_status)) {
-            // if ((press_ticks_ != 0) &&( PowerControl_ticks_ - press_ticks_ == power_off_ticks_ )) {
-                auto display = Board::GetInstance().GetDisplay();
-                // display->SetStatus(Lang::Strings::SHUT_DOWN);
-                display->ShowNotification(Lang::Strings::SHUT_DOWN);
-
                 if (timer_handle_) {
                     esp_timer_stop(timer_handle_);
                     esp_timer_delete(timer_handle_);
                 }
-                auto& app = Application::GetInstance();
-                auto codec = Board::GetInstance().GetAudioCodec();
-                if (app.GetDeviceState() == kDeviceStateListening) {
-                    is_listeningorspreaking = true;
-                } else if (app.GetDeviceState() == kDeviceStateSpeaking) {
-                    is_listeningorspreaking = true;
-                    app.SetDeviceState(kDeviceStateListening);
-                }
-                while (app.GetDeviceState() != kDeviceStateIdle && is_listeningorspreaking) {
-                    ESP_LOGI("powercontrol", "Wait for it to be back on standby before shutting down...");
-                    app.ToggleChatState(); // 切换状态
-                    vTaskDelay(pdMS_TO_TICKS(50));
-                }
-
-                vTaskDelay(pdMS_TO_TICKS(2500));
-                codec->EnableInput(false);
-                codec->EnableOutput(false);
-                gpio_set_level(DISPLAY_RES, 0);
-                ESP_LOGI("powercontrol", "shut down...");
-                gpio_set_level(Power_Control, 0);
+                is_shutting_down_ = true;
+                shutdown_delay_ticks_ = 0;
             }
             if (PowerDec_level_ == 1 && press_ticks_!= 0) {
                 PowerDec_level_ = gpio_get_level(Power_Dec);
                 if (PowerDec_level_ == 1) {
-                    press_interval_ticks_ = PowerControl_ticks_ - press_ticks_;
                     pressed = false;
                     press_ticks_ = 0;
                 }
-            }
-            if (press_interval_ticks_ != 0) {
-                if (press_interval_ticks_ < power_off_ticks_) {
-                    ESP_LOGI("powercontrol", "Rebooting...");
-                    esp_restart();
-                } 
             }
         }
     }
@@ -223,7 +194,6 @@ public:
         powercontgpio_conf.pull_down_en = GPIO_PULLDOWN_ENABLE; 
         powercontgpio_conf.pull_up_en = GPIO_PULLUP_DISABLE;     
         gpio_config(&powercontgpio_conf);
-        // vTaskDelay(pdMS_TO_TICKS(5));
         gpio_set_level(Power_Control, 1);
         ESP_LOGI("powercontrol", "turnded on ...");
         
@@ -316,8 +286,30 @@ public:
         on_charging_status_changed_ = callback;
     }
 
-    bool Getisusbinsertedonboot() const {
-        return is_usb_inserted_on_boot;
+    void shutdown() {
+        if (!new_charging_status && shutdown_first_)
+        {
+            shutdown_first_ = false; // 进入后置 false ，防止再次进入关机状态
+            gpio_config_t shutdown_gpio_conf = {};
+            shutdown_gpio_conf.intr_type = GPIO_INTR_DISABLE;
+            shutdown_gpio_conf.mode = GPIO_MODE_OUTPUT;
+            shutdown_gpio_conf.pin_bit_mask = (1ULL << Power_Dec); 
+            shutdown_gpio_conf.pull_down_en = GPIO_PULLDOWN_DISABLE; 
+            shutdown_gpio_conf.pull_up_en = GPIO_PULLUP_DISABLE;     
+            gpio_config(&shutdown_gpio_conf);
+            gpio_set_level(DISPLAY_BACKLIGHT_PIN, 0);
+            gpio_set_level(Power_Control, 0);
+            for (int i=1;i<15;i++) {
+                gpio_set_level(Power_Dec, 1);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                gpio_set_level(Power_Dec, 0);
+                vTaskDelay(pdMS_TO_TICKS(100));
+                ESP_LOGI("PowerManager","触发开关机控制");
+            }
+            ESP_LOGI("PowerManager","关机失败，进入深睡眠");
+            esp_deep_sleep_start();
+        } else {
+            ESP_LOGI("PowerManager","检测到插入usb，无法关机"); 
+        }
     }
-
 };

@@ -16,12 +16,16 @@
 #define AUDIO_I2S_GPIO_DOUT GPIO_NUM_15
 
 #define AUDIO_CODEC_USE_PCA9557
+#define AUDIO_CODEC_I2C_PA_EN  GPIO_NUM_21
 #define AUDIO_CODEC_I2C_SDA_PIN  GPIO_NUM_41
 #define AUDIO_CODEC_I2C_SCL_PIN  GPIO_NUM_42
 #define AUDIO_CODEC_ES8311_ADDR  ES8311_CODEC_DEFAULT_ADDR
 
 // 按键
 #define BOOT_BUTTON_GPIO        GPIO_NUM_0
+
+// 震动马达
+#define ZHENDONG_PIN   GPIO_NUM_3
 
 // 屏幕
 #define DISPLAY_SPI_HOST SPI3_HOST
@@ -42,17 +46,15 @@
 #define DISPLAY_BACKLIGHT_OUTPUT_INVERT false
 
 // 4g
-#define NETWORK_MODULE_POWER_IN GPIO_NUM_21
 #define ML307_RX_PIN GPIO_NUM_11
 #define ML307_TX_PIN GPIO_NUM_12
-#define NETWORK_ZXC GPIO_NUM_NC
 
 // 电源管理
 #define POWER_USB_IN GPIO_NUM_1
-#define Power_Control GPIO_NUM_48
-#define Power_Dec GPIO_NUM_47
-#define POWER_CBS_ADC_UNIT ADC_UNIT_1   // adc检测公共unit GPIO1
-#define POWER_USBIN_ADC_CHANNEL ADC_CHANNEL_0 // 检测usb是否插入 GPIO1
+#define Power_Control GPIO_NUM_48               // 电源控制引脚
+#define Power_Dec GPIO_NUM_47                   // 电源键检测引脚 
+#define POWER_CBS_ADC_UNIT ADC_UNIT_1           // adc检测公共unit GPIO1
+#define POWER_USBIN_ADC_CHANNEL ADC_CHANNEL_0   // 检测usb是否插入 GPIO1
 #define POWER_BATTERY_ADC_CHANNEL ADC_CHANNEL_6 // 电池电量检测 GPIO7
 
 #endif // _BOARD_CONFIG_H_

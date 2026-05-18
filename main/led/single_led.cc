@@ -12,13 +12,15 @@
 
 
 SingleLed::SingleLed(gpio_num_t gpio) {
-    // If the gpio is not connected, you should use NoLed class
-    assert(gpio != GPIO_NUM_NC);
+    if (gpio == GPIO_NUM_NC) {
+        ESP_LOGW(TAG, "SingleLed initialized with GPIO_NUM_NC, LED will not function");
+        return;
+    }
 
     led_strip_config_t strip_config = {};
     strip_config.strip_gpio_num = gpio;
     strip_config.max_leds = 1;
-    strip_config.led_pixel_format = LED_PIXEL_FORMAT_GRB;
+    strip_config.color_component_format = LED_STRIP_COLOR_COMPONENT_FMT_GRB;
     strip_config.led_model = LED_MODEL_WS2812;
 
     led_strip_rmt_config_t rmt_config = {};
@@ -41,7 +43,9 @@ SingleLed::SingleLed(gpio_num_t gpio) {
 }
 
 SingleLed::~SingleLed() {
-    esp_timer_stop(blink_timer_);
+    if (blink_timer_ != nullptr) {
+        esp_timer_stop(blink_timer_);
+    }
     if (led_strip_ != nullptr) {
         led_strip_del(led_strip_);
     }
