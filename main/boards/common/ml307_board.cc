@@ -84,7 +84,9 @@ Mqtt* Ml307Board::CreateMqtt() {
 }
 
 Udp* Ml307Board::CreateUdp() {
-    return new Ml307Udp(modem_, 0);
+    // ML307 的 connect_id 是模组 socket 编号，MQTT 已占用 0。
+    // MQTT=0、WebSocket=1、UDP=2，避免 AT+MIPOPEN 冲突。
+    return new Ml307Udp(modem_, 2);
 }
 
 const char* Ml307Board::GetNetworkStateIcon() {

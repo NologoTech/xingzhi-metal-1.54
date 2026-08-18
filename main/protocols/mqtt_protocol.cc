@@ -127,7 +127,6 @@ bool MqttProtocol::SendAudio(const AudioStreamPacket& packet) {
     if (udp_ == nullptr) {
         return false;
     }
-
     std::string nonce(aes_nonce_);
     *(uint16_t*)&nonce[2] = htons(packet.payload.size());
     *(uint32_t*)&nonce[8] = htonl(packet.timestamp);
@@ -198,6 +197,11 @@ bool MqttProtocol::OpenAudioChannel() {
         delete udp_;
     }
     udp_ = Board::GetInstance().CreateUdp();
+    if (udp_ == nullptr) {
+        ESP_LOGE(TAG, "Failed to create UDP connection");
+        SetError(Lang::Strings::SERVER_NOT_CONNECTED);
+        return false;
+    }
     udp_->OnMessage([this](const std::string& data) {
         /*
          * UDP Encrypted OPUS Packet Format:
@@ -244,7 +248,13 @@ bool MqttProtocol::OpenAudioChannel() {
         last_incoming_time_ = std::chrono::steady_clock::now();
     });
 
-    udp_->Connect(udp_server_, udp_port_);
+    if (!udp_->Connect(udp_server_, udp_port_) || !udp_->connected()) {
+        ESP_LOGE(TAG, "Failed to connect to UDP server");
+        delete udp_;
+        udp_ = nullptr;
+        SetError(Lang::Strings::SERVER_NOT_CONNECTED);
+        return false;
+    }
 
     if (on_audio_channel_opened_ != nullptr) {
         on_audio_channel_opened_();
@@ -310,13 +320,19 @@ void MqttProtocol::ParseServerHello(const cJSON* root) {
         ESP_LOGE(TAG, "UDP is not specified");
         return;
     }
-    udp_server_ = cJSON_GetObjectItem(udp, "server")->valuestring;
-    udp_port_ = cJSON_GetObjectItem(udp, "port")->valueint;
-    auto key = cJSON_GetObjectItem(udp, "key")->valuestring;
-    auto nonce = cJSON_GetObjectItem(udp, "nonce")->valuestring;
-
-    // auto encryption = cJSON_GetObjectItem(udp, "encryption")->valuestring;
-    // ESP_LOGI(TAG, "UDP server: %s, port: %d, encryption: %s", udp_server_.c_str(), udp_port_, encryption);
+    auto server_item = cJSON_GetObjectItem(udp, "server");
+    auto port_item = cJSON_GetObjectItem(udp, "port");
+    auto key_item = cJSON_GetObjectItem(udp, "key");
+    auto nonce_item = cJSON_GetObjectItem(udp, "nonce");
+    if (!cJSON_IsString(server_item) || !cJSON_IsNumber(port_item) ||
+        !cJSON_IsString(key_item) || !cJSON_IsString(nonce_item)) {
+        ESP_LOGE(TAG, "Invalid UDP hello fields");
+        return;
+    }
+    udp_server_ = server_item->valuestring;
+    udp_port_ = port_item->valueint;
+    auto key = key_item->valuestring;
+    auto nonce = nonce_item->valuestring;
     aes_nonce_ = DecodeHexString(nonce);
     mbedtls_aes_init(&aes_ctx_);
     mbedtls_aes_setkey_enc(&aes_ctx_, (const unsigned char*)DecodeHexString(key).c_str(), 128);
